@@ -15,11 +15,11 @@ trait NonBlockingListInstance {
       def runAlgebra[A](algebra: ListAlgebra[A], ops: RedisOps) =
         algebra match {
           case Blpop(k, t, h) =>
-            ops.blpop[String, String](t, k.head, k.tail:_*).map(h(_))
+            ops.blpop[String](t.toInt, k.list).map(h(_))
           case Brpop(k, t, h) =>
-            ops.brpop[String, String](t, k.head, k.tail:_*).map(h(_))
+            ops.brpop[String](t.toInt, k.list).map(h(_))
           case Brpoplpush(s, d, t, h) =>
-            ops.brpoplpush(s, d, t).map(h(_))
+            ops.brpoplpush(s, d, t.toInt).map(h(_))
           case Lindex(k, i, h) =>
             ops.lindex(k, i.toInt).map(h(_))
           case Linsert(k, o, p, v, h) =>

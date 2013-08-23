@@ -17,13 +17,13 @@ trait NonBlockingKeyInstance {
       def runAlgebra[A](algebra: KeyAlgebra[A], ops: RedisOps) =
         algebra match {
           case Del(k, h) =>
-            ops.del(k.head, k.tail).map(h(_))
+            ops.del(k.list).map(h(_))
           case Dump(_, h) =>
             Future.failed(new Exception("Unsupported operation Dump")).map(a => h(None))
           case Exists(k, h) =>
             ops.exists(k).map(h(_))
           case Expire(k, i, h) =>
-            ops.expire(k, i).map(h(_))
+            ops.expire(k, i.toInt).map(h(_))
           case Expireat(k, a, h) =>
             ops.expireat(k, a).map(h(_))
           case Keys(p, h) =>
@@ -31,7 +31,6 @@ trait NonBlockingKeyInstance {
           case Persist(k, h) =>
             ops.persist(k).map(h(_))
           case Pexpire(k, i, h) =>
-            // TODO: Is an int sufficient for this?
             ops.pexpire(k, i.toInt).map(h(_))
           case Pexpireat(k, a, h) =>
             ops.pexpireat(k, a).map(h(_))
@@ -46,10 +45,9 @@ trait NonBlockingKeyInstance {
           case Restore(k, t, v, a) =>
             Future.failed(new Exception("Unsupported operation Restore")).map(_ => a)
           case Ttl(k, h) =>
-            // TODO: Should seconds be long or int?
-            ops.ttl(k).map(a => h((a != -1L).option(a.toInt)))
+            ops.ttl(k).map(a => h((a != -1L).option(a)))
           case Type(k, h) =>
-            ops.getType(k).map {
+            ops.`type`(k).map {
               case "hash" => h(hash_)
               case "list" => h(list_)
               case "set" => h(set_)

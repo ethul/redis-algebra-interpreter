@@ -26,11 +26,11 @@ trait NonBlockingStringInstance {
           case Bitcount(k, s, e, h) =>
             ops.bitcount(k, s.fzip(e)).map(h(_))
           case Bitop(And(d, k), h) =>
-            ops.bitop("AND", d, k.list).map(h(_))
+            ops.bitop("AND", d, k.list:_*).map(h(_))
           case Bitop(Or(d, k), h) =>
-            ops.bitop("OR", d, k.list).map(h(_))
+            ops.bitop("OR", d, k.list:_*).map(h(_))
           case Bitop(Xor(d, k), h) =>
-            ops.bitop("XOR", d, k.list).map(h(_))
+            ops.bitop("XOR", d, k.list:_*).map(h(_))
           case Bitop(Not(d, k), h) =>
             ops.bitop("NOT", d, k).map(h(_))
           case Decr(k, h) =>
@@ -40,7 +40,7 @@ trait NonBlockingStringInstance {
           case Get(k, h) =>
             ops.get(k).map(h(_))
           case Getbit(k, o, h) =>
-            ops.getbit(k, o).map(h(_))
+            ops.getbit(k, o).map(a => h(a.fold(1, 0)))
           case Getrange(k, s, t, h) =>
             ops.getrange(k, s, t).map(a => h(a.cata(a => a, "")))
           case Getset(k, v, h) =>
@@ -52,9 +52,7 @@ trait NonBlockingStringInstance {
           case Incrbyfloat(k, i, h) =>
             Future.failed(new Exception("Unsupported operation Incrbyfloat")).map(_ => h(0))
           case Mget(k, h) =>
-            ops.mget[String, String](k.head, k.tail:_*).map { a =>
-              h(k.map(a.get(_).flatMap(a => (a == null).option(a))).list)
-            }
+            ops.mget[String](k.list).map(a => h(k.map(a.get(_).flatMap(a => (a != null).option(a))).list))
           case Mset(p, a) =>
             ops.mset(p.list:_*).map(_ => a)
           case Msetnx(p, h) =>
@@ -63,7 +61,8 @@ trait NonBlockingStringInstance {
             ops.psetex(k, i.toInt, v).map(_ => a)
           case Set(k, v, i, o, h) =>
             ops.set(
-              key = k, value = v,
+              key = k,
+              value = v,
               exORpx = i.map(_.fold(EX(_), PX(_))),
               nxORxx = o.map {
                 case Nx => NX
@@ -71,9 +70,9 @@ trait NonBlockingStringInstance {
               }
             ).map(h(_))
           case Setbit(k, o, v, h) =>
-            ops.setbit(k, o, v).map(h(_))
+            ops.setbit(k, o, v == "1").map(h(_))
           case Setex(k, i, v, a) =>
-            ops.setex(k, i, v).map(_ => a)
+            ops.setex(k, i.toInt, v).map(_ => a)
           case Setnx(k, v, h) =>
             ops.setnx(k, v).map(h(_))
           case Setrange(k, o, v, h) =>

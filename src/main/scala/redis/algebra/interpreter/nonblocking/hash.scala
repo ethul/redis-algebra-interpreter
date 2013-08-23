@@ -17,7 +17,7 @@ trait NonBlockingHashInstance {
       def runAlgebra[A](algebra: HashAlgebra[A], ops: RedisOps) =
         algebra match {
           case Hdel(k, f, h) =>
-            ops.hdel(k, f.head, f.tail).map(h(_))
+            ops.hdel(k, f.list).map(h(_))
           case Hexists(k, f, h) =>
             ops.hexists(k, f).map(h(_))
           case Hget(k, f, h) =>
@@ -33,9 +33,7 @@ trait NonBlockingHashInstance {
           case Hlen(k, h) =>
             ops.hlen(k).map(h(_))
           case Hmget(k, f, h) =>
-            ops.hmget[String, String](k, f.list:_*).map { a =>
-              h(f.map(a.get(_).flatMap(a => (a == null).option(a))).list)
-            }
+            ops.hmget[String](k, f.list:_*).map(a => h(f.map(a.get(_).flatMap(a => (a != null).option(a))).list))
           case Hmset(k, p, a) =>
             ops.hmset(k, p.list).map(_ => a)
           case Hset(k, f, v, h) =>

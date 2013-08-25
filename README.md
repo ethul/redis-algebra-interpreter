@@ -4,7 +4,7 @@ An interpreter for running programs written using the [Redis Algebra](https://gi
 
 # Install
 
-Currently, a snapshot of the Redis Algebra interpreter is available in the following repository. The snippet below may be added to an SBT build file in order to use the Redis Algebra.
+Currently, a snapshot of the Redis Algebra Interpreter is available in the following repository. The snippet below may be added to an SBT build file in order to use the Redis Algebra Interpreter.
 
 ```scala
 libraryDependencies += "redis-algebra-interpreter" %% "redis-algebra-interpreter" % "0.0.1-SNAPSHOT"

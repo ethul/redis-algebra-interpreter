@@ -6,7 +6,7 @@ scalaVersion := "2.10.2"
 
 libraryDependencies += "redis-algebra" %% "redis-algebra" % "0.0.1-SNAPSHOT"
 
-libraryDependencies += "net.debasishg" %% "redisclient" % "2.11-SNAPSHOT"
+libraryDependencies += "net.debasishg" %% "redisreact" % "0.1"
 
 libraryDependencies += "org.specs2" %% "specs2" % "2.2-scalaz-7.1.0-SNAPSHOT" % "test"
 

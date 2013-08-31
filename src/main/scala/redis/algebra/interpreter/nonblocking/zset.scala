@@ -48,7 +48,7 @@ trait NonBlockingZSetInstance {
             val (w, d) = endpoint(n)
             ops.zrangeByScoreWithScores(k, v, c, w, d, l.map(a => (a.offset.toInt, a.count.toInt))).map(a => h(a.map(_.map(_.some))))
           case Zrank(k, m, h) =>
-            ops.zrank(k, m).map(a => h((a != null).option(a)))
+            ops.zrank(k, m).map(h(_))
           case Zrem(k, m, h) =>
             ops.zrem(k, m.list).map(h(_))
           case Zremrangebyrank(k, s, t, h) =>
@@ -70,7 +70,7 @@ trait NonBlockingZSetInstance {
             val (w, d) = endpoint(n)
             ops.zrevrangeByScoreWithScores(k, v, c, w, d, l.map(a => (a.offset.toInt, a.count.toInt))).map(a => h(a.map(_.map(_.some))))
           case Zrevrank(k, m, h) =>
-            ops.zrevrank(k, m).map(a => h((a != null).option(a)))
+            ops.zrevrank(k, m).map(h(_))
           case Zscore(k, m, h) =>
             ops.zscore(k, m).map(h(_))
           case Zunionstore(d, k, None, a, h) =>

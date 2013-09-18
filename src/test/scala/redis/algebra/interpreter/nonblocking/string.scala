@@ -10,7 +10,7 @@ import scalaz.std.option._
 import scalaz.syntax.{monad, zip}, monad._, zip._
 import scalaz.syntax.std.option._
 
-import KeyAlgebra._, StringAlgebra._
+import all._
 
 class NonBlockingStringInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
   This is the specification for the string instance.

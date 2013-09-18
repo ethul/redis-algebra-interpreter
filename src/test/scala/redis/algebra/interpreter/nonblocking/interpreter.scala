@@ -10,17 +10,19 @@ import java.util.UUID
 import akka.util.Timeout
 import akka.actor.ActorSystem
 
-import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
 import scalaz.Free
+import scalaz.syntax.comonad._
+
+import future._
 
 trait InterpreterSpec {
-  def run[A](a: Free[R, A]): A = Await.result(NonBlocking.run(a, client), duration)
+  def run[A](a: Free[R, A]): A = NonBlocking.run(a, client).copoint
 
   def generate = s"redis-algebra-interpreter:${UUID.randomUUID.toString}"
 
-  val duration = Duration(2, "seconds")
+  implicit val duration = Duration(2, "seconds")
 
   implicit val system = ActorSystem("redis-algebra-interpreter")
 
@@ -29,4 +31,6 @@ trait InterpreterSpec {
   implicit val timeout = Timeout(duration)
 
   val client = RedisClient("localhost", 6379)
+
+  val memory = Map[String, String]()
 }

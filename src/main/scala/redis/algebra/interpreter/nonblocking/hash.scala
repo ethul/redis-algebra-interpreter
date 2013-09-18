@@ -3,45 +3,47 @@ package algebra
 package interpreter
 package nonblocking
 
+import com.redis.RedisClient
+
 import akka.util.Timeout
 
 import scala.concurrent.{ExecutionContext, Future}
 
 import scalaz.syntax.std.boolean._
 
-import NonBlocking._, future._
+import future._
 
-trait NonBlockingHashInstance {
+trait NonBlockingHashInstance extends HashInstances {
   implicit def hashAlgebraNonBlocking(implicit EC: ExecutionContext, T: Timeout): NonBlocking[HashAlgebra] =
     new NonBlocking[HashAlgebra] {
-      def runAlgebra[A](algebra: HashAlgebra[A], ops: RedisOps) =
+      def runAlgebra[A](algebra: HashAlgebra[A], client: RedisClient) =
         algebra match {
           case Hdel(k, f, h) =>
-            ops.hdel(k, f.list).map(h(_))
+            client.hdel(k, f.list).map(h(_))
           case Hexists(k, f, h) =>
-            ops.hexists(k, f).map(h(_))
+            client.hexists(k, f).map(h(_))
           case Hget(k, f, h) =>
-            ops.hget(k, f).map(h(_))
+            client.hget(k, f).map(h(_))
           case Hgetall(k, h) =>
-            ops.hgetall(k).map(a => h(a.toSeq))
+            client.hgetall(k).map(a => h(a.toList))
           case Hincrby(k, f, i, h) =>
-            ops.hincrby(k, f, i.toInt).map(h(_))
+            client.hincrby(k, f, i.toInt).map(h(_))
           case Hincrbyfloat(k, f, i, h) =>
             Future.failed(new Exception("Unsupported operation Hincrbyfloat")).map(_ => h(0))
           case Hkeys(k, h) =>
-            ops.hkeys(k).map(h(_))
+            client.hkeys(k).map(h(_))
           case Hlen(k, h) =>
-            ops.hlen(k).map(h(_))
+            client.hlen(k).map(h(_))
           case Hmget(k, f, h) =>
-            ops.hmget[String](k, f.list:_*).map(a => h(f.map(a.get(_).flatMap(a => (a != null).option(a))).list))
-          case Hmset(k, p, a) =>
-            ops.hmset(k, p.list).map(_ => a)
+            client.hmget[String](k, f.list).map(a => h(f.map(a.get(_).flatMap(a => (a != null).option(a))).list))
+          case Hmset(k, p, h) =>
+            client.hmset(k, p.list).map(a => h(a.fold(Ok, Error)))
           case Hset(k, f, v, h) =>
-            ops.hset(k, f, v).map(h(_))
+            client.hset(k, f, v).map(h(_))
           case Hsetnx(k, f, v, h) =>
-            ops.hsetnx(k, f, v).map(h(_))
+            client.hsetnx(k, f, v).map(h(_))
           case Hvals(k, h) =>
-            ops.hvals(k).map(h(_))
+            client.hvals(k).map(h(_))
         }
     }
 }

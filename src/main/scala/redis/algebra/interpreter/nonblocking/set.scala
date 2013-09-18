@@ -3,47 +3,49 @@ package algebra
 package interpreter
 package nonblocking
 
+import com.redis.RedisClient
+
 import akka.util.Timeout
 
 import scala.concurrent.{ExecutionContext, Future}
 
 import scalaz.syntax.std.option._
 
-import NonBlocking._, future._
+import future._
 
-trait NonBlockingSetInstance {
+trait NonBlockingSetInstance extends SetInstances {
   implicit def setAlgebraNonBlocking(implicit EC: ExecutionContext, T: Timeout): NonBlocking[SetAlgebra] =
     new NonBlocking[SetAlgebra] {
-      def runAlgebra[A](algebra: SetAlgebra[A], ops: RedisOps) =
+      def runAlgebra[A](algebra: SetAlgebra[A], client: RedisClient) =
         algebra match {
           case Sadd(k, m, h) =>
-            ops.sadd(k, m.head, m.tail:_*).map(h(_))
+            client.sadd(k, m.head, m.tail:_*).map(h(_))
           case Scard(k, h) =>
-            ops.scard(k).map(h(_))
+            client.scard(k).map(h(_))
           case Sdiff(k, h) =>
-            ops.sdiff(k.head, k.tail:_*).map(h(_))
+            client.sdiff(k.head, k.tail:_*).map(h(_))
           case Sdiffstore(d, k, h) =>
-            ops.sdiffstore(d, k.head, k.tail:_*).map(h(_))
+            client.sdiffstore(d, k.head, k.tail:_*).map(h(_))
           case Sinter(k, h) =>
-            ops.sinter(k.head, k.tail:_*).map(h(_))
+            client.sinter(k.head, k.tail:_*).map(h(_))
           case Sinterstore(d, k, h) =>
-            ops.sinterstore(d, k.head, k.tail:_*).map(h(_))
+            client.sinterstore(d, k.head, k.tail:_*).map(h(_))
           case Sismember(k, m, h) =>
-            ops.sismember(k, m).map(h(_))
+            client.sismember(k, m).map(h(_))
           case Smembers(k, h) =>
-            ops.smembers(k).map(h(_))
+            client.smembers(k).map(h(_))
           case Smove(s, d, m, h) =>
-            ops.smove(s, d, m).map(a => h(a == 1L))
+            client.smove(s, d, m).map(a => h(a == 1L))
           case Spop(k, h) =>
-            ops.spop(k).map(h(_))
+            client.spop(k).map(h(_))
           case Srandmember(k, c, h) =>
-            ops.srandmember(k, c.cata(a => a.toInt, 1)).map(a => h(a.toSet))
+            client.srandmember(k, c.cata(a => a.toInt, 1)).map(a => h(a.toSet))
           case Srem(k, m, h) =>
-            ops.srem(k, m.head, m.tail:_*).map(h(_))
+            client.srem(k, m.head, m.tail:_*).map(h(_))
           case Sunion(k, h) =>
-            ops.sunion(k.head, k.tail:_*).map(h(_))
+            client.sunion(k.head, k.tail:_*).map(h(_))
           case Sunionstore(d, k, h) =>
-            ops.sunionstore(d, k.head, k.tail:_*).map(h(_))
+            client.sunionstore(d, k.head, k.tail:_*).map(h(_))
         }
     }
 }

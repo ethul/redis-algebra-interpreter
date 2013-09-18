@@ -8,7 +8,7 @@ import org.specs2._, specification.BeforeAfter
 import scalaz.NonEmptyList._
 import scalaz.syntax.std.option._
 
-import KeyAlgebra._, SetAlgebra._
+import all._
 
 class NonBlockingSetInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
   This is the specification for the set instance.

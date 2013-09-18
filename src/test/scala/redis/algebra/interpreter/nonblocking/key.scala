@@ -5,11 +5,11 @@ package nonblocking
 
 import org.specs2._, specification.BeforeAfter
 
-import scalaz.{-\/, NonEmptyList}, NonEmptyList._
+import scalaz.{-\/, \/-, NonEmptyList}, NonEmptyList._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 
-import HashAlgebra._, KeyAlgebra._, ListAlgebra._, SetAlgebra._, StringAlgebra._, ZSetAlgebra._
+import all._
 
 class NonBlockingKeyInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
   This is the specification for the key instance.
@@ -27,19 +27,34 @@ class NonBlockingKeyInstanceSpec extends Specification with InterpreterSpec { de
     result in a some value of the time to live in seconds              ${ea().e4}
 
   Interpreting the type command with a key that has a string should
-    result in a string_ type object                                    ${eb().e5}
+    result in a some RedisString object                                ${eb().e5}
 
   Interpreting the type command with a key that has a hash should
-    result in a hash_ type object                                      ${eb().e6}
+    result in a some RedisHash object                                  ${eb().e6}
 
   Interpreting the type command with a key that has a list should
-    result in a list_ type object                                      ${eb().e7}
+    result in a some RedisList object                                  ${eb().e7}
 
   Interpreting the type command with a key that has a set should
-    result in a set_ type object                                       ${eb().e8}
+    result in a some RedisSet object                                   ${eb().e8}
 
   Interpreting the type command with a key that has a zset should
-    result in a zset_ type object                                      ${eb().e9}
+    result in a some RedisZSet object                                  ${eb().e9}
+
+  Interpreting the type command with a non existing key should
+    result in a none                                                   ${eb().e10}
+
+  Interpreting the sort command on a list should
+    result in an sorted ascending list                                 ${ec().e11}
+
+  Interpreting the sort command on a list with Desc should
+    result in an sorted descending list                                ${ec().e12}
+
+  Interpreting the sort command on a list with a key to store should
+    result in the length of the list                                   ${ec().e13}
+
+  Interpreting the sort command on a list with a key to store should
+    result in the sorted ascending list at the store key               ${ec().e14}
   """
 
   case class ea() extends BeforeAfter {
@@ -71,16 +86,58 @@ class NonBlockingKeyInstanceSpec extends Specification with InterpreterSpec { de
 
     def after = run(del(nels(key1, key2, key3, key4, key5)))
 
-    def e5 = this { run(type_(key1)) === string_ }
+    def e5 = this { run(`type`(key1)) must beSome(RedisString) }
 
-    def e6 = this { run(type_(key2)) === hash_ }
+    def e6 = this { run(`type`(key2)) must beSome(RedisHash) }
 
-    def e7 = this { run(type_(key3)) === list_ }
+    def e7 = this { run(`type`(key3)) must beSome(RedisList) }
 
-    def e8 = this { run(type_(key4)) === set_ }
+    def e8 = this { run(`type`(key4)) must beSome(RedisSet) }
 
-    def e9 = this { run(type_(key5)) === zset_ }
+    def e9 = this { run(`type`(key5)) must beSome(RedisZSet) }
 
-    val (key1, key2, key3, key4, key5) = (generate, generate, generate, generate, generate)
+    def e10 = this { run(`type`(key6)) must beNone }
+
+    val (key1, key2, key3, key4, key5, key6) = (generate, generate, generate, generate, generate, generate)
+  }
+
+  case class ec() extends BeforeAfter {
+    def before = run(lpush(key1, nel(unsorted.head.toString, unsorted.tail.map(_.toString))))
+
+    def after = run(del(nels(key1, key2)))
+
+    def e11 = this { run(sort(key1)) must beLike {
+      case -\/(a) =>
+        a must contain(allOf(unsorted.sorted.map(_.toString):_*).inOrder)
+      case _ =>
+        ko
+    }}
+
+    def e12 = this { run(sort(key = key1, order = Desc)) must beLike {
+      case -\/(a) =>
+        a must contain(allOf(unsorted.sorted.reverse.map(_.toString):_*).inOrder)
+      case _ =>
+        ko
+    }}
+
+    def e13 = this { run(sort(key = key1, store = key2.some)) must beLike {
+      case \/-(a) =>
+        a === unsorted.length
+      case _ =>
+        ko
+    }}
+
+    def e14 = this {
+      run {
+        sort[R](key = key1, store = key2.some) >>= {
+          case \/-(a) => lrange[R](key2, 0, a)
+          case _ => throw new Exception("Unexpected case")
+        }
+      } must contain(allOf(unsorted.sorted.map(_.toString):_*).inOrder)
+    }
+
+    val unsorted = List(10, 5, 3, 1, 9, 12)
+
+    val (key1, key2) = (generate, generate)
   }
 }

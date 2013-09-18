@@ -8,7 +8,7 @@ import org.specs2._, specification.BeforeAfter
 import scalaz.NonEmptyList._
 import scalaz.syntax.std.option._
 
-import HashAlgebra._, KeyAlgebra._
+import all._
 
 class NonBlockingHashInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
   This is the specification for the hash instance.

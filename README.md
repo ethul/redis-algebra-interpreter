@@ -28,7 +28,7 @@ import scalaz.std.list._
 import scalaz.syntax.all._
 
 import redis.algebra.{F, R}
-import redis.algebra.{KeyAlgebra, ListAlgebra, StringAlgebra}, KeyAlgebra._, ListAlgebra._, StringAlgebra._
+import redis.algebra.all._
 import redis.algebra.interpreter.nonblocking.NonBlocking
 
 val e0 =

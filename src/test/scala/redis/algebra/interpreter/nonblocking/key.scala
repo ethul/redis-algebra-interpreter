@@ -11,6 +11,7 @@ import scalaz.syntax.std.option._
 
 import all._
 
+/*
 class NonBlockingKeyInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
   This is the specification for the key instance.
 
@@ -141,3 +142,4 @@ class NonBlockingKeyInstanceSpec extends Specification with InterpreterSpec { de
     val (key1, key2) = (generate, generate)
   }
 }
+*/

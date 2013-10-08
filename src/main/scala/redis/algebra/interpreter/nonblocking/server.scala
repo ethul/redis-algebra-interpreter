@@ -4,14 +4,18 @@ package interpreter
 package nonblocking
 
 import com.redis.RedisClient
+import com.redis.protocol.{ANil, ArgsOps, RedisCommand}, RedisCommand.Args
+import com.redis.serialization.DefaultWriters.{anyWriter => _, _}
 
-import akka.util.Timeout
+import akka.util.{ByteString => AkkaByteString, Timeout}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import scalaz.syntax.std.{boolean, option}, boolean._, option._
+import scalaz.{\/, EitherT}, EitherT.eitherT
+import scalaz.syntax.monad._
+import scalaz.syntax.std.{boolean, option, string}, boolean._, option._, string._
 
-import future._
+import data.{Error, Get, GetResult, Host, Len, LenResult, Noone, Ok, Reset, ResetResult}, future._, syntax._
 
 trait NonBlockingServerInstance extends ServerInstances {
   implicit def serverAlgebraNonBlocking(implicit EC: ExecutionContext, T: Timeout): NonBlocking[ServerAlgebra] =
@@ -19,63 +23,83 @@ trait NonBlockingServerInstance extends ServerInstances {
       def runAlgebra[A](algebra: ServerAlgebra[A], client: RedisClient) =
         algebra match {
           case Bgrewriteaof(h) =>
-            client.bgrewriteaof.map(a => h(a.fold(Ok, Error)))
+            client.ask(Command[Boolean](algebra.command, ANil)).map(a => h(a.fold(Ok, Error)))
           case Bgsave(h) =>
-            client.bgsave.map(a => h(a.fold(Ok, Error)))
+            client.ask(Command[Boolean](algebra.command, ANil)).map(a => h(a.fold(Ok, Error)))
           case Clientgetname(h) =>
-            client.client.getname.map(h(_))
+            client.ask(Command[Option[AkkaByteString]](CLIENT, GETNAME +: ANil)).map(h(_))
           case Clientkill(i, p, h) =>
-            client.client.kill(s"${i}:${p}").map(a => h(a.fold(Ok, Error)))
+            client.ask(Command[Boolean](CLIENT, KILL +: s"${i}:${p}" +: ANil)).map(a => h(a.fold(Ok, Error)))
           case Clientlist(h) =>
-            client.client.list.map(a => h(a.cata(_.split('\n').map(_.split(' ').map(_.split('=')).map(a => (a.head, a.last)).toMap).toList, Nil)))
+            client.ask(Command[Seq[AkkaByteString]](CLIENT, LIST +: ANil)).map(h(_))
           case Clientsetname(n, h) =>
-            client.client.setname(n).map(a => h(a.fold(Ok, Error)))
+            client.ask(Command[Boolean](CLIENT, SETNAME +: n.toArray +: ANil)).map(a => h(a.fold(Ok, Error)))
           case Configget(p, h) =>
-            client.config.get(p).map(a => h(a.cata(_.split('\n').toList, Nil)))
+            client.ask(Command[Seq[AkkaByteString]](CONFIG, GET +: p.toArray +: ANil)).map(h(_))
           case Configresetstat(h) =>
-            client.config.resetstat.map(a => h(a.fold(Ok, Error)))
+            client.ask(Command[Boolean](CONFIG, RESETSTAT +: ANil)).map(a => h(a.fold(Ok, Error)))
           case Configrewrite(h) =>
-            client.config.rewrite.map(a => h(a.fold(Ok, Error)))
+            client.ask(Command[Boolean](CONFIG, REWRITE +: ANil)).map(a => h(a.fold(Ok, Error)))
           case Configset(p, v, h) =>
-            client.config.set(p, v).map(a => h(a.fold(Ok, Error)))
+            client.ask(Command[Boolean](CONFIG, SET +: p.toArray +: v.toArray +: ANil)).map(a => h(a.fold(Ok, Error)))
           case Dbsize(h) =>
-            client.dbsize.map(a => h(a.toShort))
-          case Debugobject(_, h) =>
-            Future.failed(new Exception("Unsupported operation Debugobject")).map(_ => h(Error))
+            client.ask(Command[Int](algebra.command, ANil)).map(a => h(a.toShort))
+          case Debugobject(k, h) =>
+            client.ask(Command[Boolean](DEBUG, OBJECT +: k.toArray +: ANil)).map(a => h(a.fold(Ok, Error)))
           case Debugsegfault(h) =>
-            Future.failed(new Exception("Unsupported operation Debugsegfault")).map(_ => h(Error))
+            client.ask(Command[Boolean](DEBUG, SEGFAULT +: ANil)).map(a => h(a.fold(Ok, Error)))
           case Flushall(h) =>
-            client.flushall.map(a => h(a.fold(Ok, Error)))
+            client.ask(Command[Boolean](algebra.command, ANil)).map(a => h(a.fold(Ok, Error)))
           case Flushdb(h) =>
-            client.flushdb.map(a => h(a.fold(Ok, Error)))
-          case Info(_, h) =>
-            client.info.map(a => h(a.cata(_.split('\n').filter(_.isEmpty).foldLeft(("", Map[String, Map[String, String]]())) { (b, line) =>
-              line.startsWith("#").fold(
-                (line.split('#').last.trim, b._2), {
-                  val Array(k, v) = line.split(':')
-                  val c = b._2(b._1) + (k -> v)
-                  (b._1, b._2 + (b._1 -> c))
-                }
-              )
-            }._2, Map())))
+            client.ask(Command[Boolean](algebra.command, ANil)).map(a => h(a.fold(Ok, Error)))
+          case Info(s, h) =>
+            client.ask(Command[AkkaByteString](algebra.command, s.cata(_.toArray +: ANil, ANil))).map(h(_))
           case Lastsave(h) =>
-            client.lastsave.map(h(_))
+            client.ask(Command[Long](algebra.command, ANil)).map(h(_))
           case Monitor(h) =>
             Future.failed(new Exception("Unsupported operation Monitor")).map(_ => h(Stream.Empty))
           case Save(h) =>
-            client.save.map(a => h(a.fold(Ok, Error)))
-          case Shutdown(_, h) =>
-            client.shutdown.map(a => h(a.fold(Ok, Error)))
+            client.ask(Command[Boolean](algebra.command, ANil)).map(a => h(a.fold(Ok, Error)))
+          case Shutdown(s, h) =>
+            client.ask(Command[Boolean](algebra.command, s.cata(_.fold(SAVE, NOSAVE) +: ANil, ANil))).map(a => h(a.fold(Ok, Error)))
           case Slaveof(Noone, h) =>
-            client.slaveof(None).map(a => h(a.fold(Ok, Error)))
+            client.ask(Command[Boolean](algebra.command, NOONE +: ANil)).map(a => h(a.fold(Ok, Error)))
           case Slaveof(Host(n, p), h) =>
-            client.slaveof(Some((n, p))).map(a => h(a.fold(Ok, Error)))
-          case Slowlog(_, h) =>
-            Future.failed(new Exception("Unsupported operation Slowlog")).map(_ => h(null))
+            client.ask(Command[Boolean](algebra.command, n.toArray +: p +: ANil)).map(a => h(a.fold(Ok, Error)))
+          case Slowlog(Get(l), h) =>
+            client.ask(Command[Seq[AkkaByteString]](algebra.command, l.cata(_ +: ANil, ANil))).map(a => h(GetResult(a)))
+          case Slowlog(Len, h) =>
+            client.ask(Command[Int](algebra.command, ANil)).map(a => h(LenResult(a)))
+          case Slowlog(Reset, h) =>
+            client.ask(Command[Boolean](algebra.command, ANil)).map(_ => h(ResetResult))
           case Sync(a) =>
-            Future.failed(new Exception("Unsupported operation Sync")).map(_ => a)
+            client.ask(Command[Boolean](algebra.command, ANil)).map(_ => a)
           case Time(h) =>
-            Future.failed(new Exception("Unsupported operation Time")).map(_ => h((0L, 0)))
+            eitherT {
+              client.ask(Command[Seq[AkkaByteString]](algebra.command, ANil)).map {
+                case a :: b :: Nil =>
+                  (a.utf8String.parseLong.disjunction |@| b.utf8String.parseInt.disjunction).tupled
+                case a =>
+                  \/.left(new NumberFormatException(s"Invalid time response: $a"))
+              }
+            }.map(h(_)).run.flatMap(_.fold(Future.failed(_), _.point[Future]))
         }
+
+      val CLIENT = "CLIENT"
+      val CONFIG = "CONFIG"
+      val DEBUG = "DEBUG"
+      val GET = "GET"
+      val GETNAME = "GETNAME"
+      val KILL = "KILL"
+      val LIST = "LIST"
+      val NOONE = "NO ONE"
+      val NOSAVE = "NOSAVE"
+      val OBJECT = "OBJECT"
+      val RESETSTAT = "RESETSTAT"
+      val REWRITE = "REWRITE"
+      val SAVE = "SAVE"
+      val SEGFAULT = "SEGFAULT"
+      val SET = "SET"
+      val SETNAME = "SETNAME"
     }
 }

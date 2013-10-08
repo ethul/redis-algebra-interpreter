@@ -7,6 +7,7 @@ import org.specs2._
 
 import all._
 
+/*
 class NonBlockingServerInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
   This is the specification for the server instance.
 
@@ -37,3 +38,4 @@ class NonBlockingServerInstanceSpec extends Specification with InterpreterSpec {
     def e3 = run(info()) must haveKeys("a")
   }
 }
+*/

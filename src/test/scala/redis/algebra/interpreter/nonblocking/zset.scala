@@ -10,6 +10,7 @@ import scalaz.syntax.std.option._
 
 import all._
 
+/*
 class NonBlockingZSetInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
   This is the specification for the zset instance.
 
@@ -76,3 +77,4 @@ class NonBlockingZSetInstanceSpec extends Specification with InterpreterSpec { d
     val score = 1.0
   }
 }
+*/

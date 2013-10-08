@@ -9,6 +9,7 @@ import scalaz.{-\/, \/-}
 
 import all._
 
+/*
 class NonBlockingScriptInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
   This is the specification for the script instance.
 
@@ -49,3 +50,4 @@ class NonBlockingScriptInstanceSpec extends Specification with InterpreterSpec {
     val string = "string"
   }
 }
+*/

@@ -10,6 +10,7 @@ import scalaz.syntax.std.option._
 
 import all._
 
+/*
 class NonBlockingHashInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
   This is the specification for the hash instance.
 
@@ -31,3 +32,4 @@ class NonBlockingHashInstanceSpec extends Specification with InterpreterSpec { d
     val (value1, value2, value3) = ("a", "b", "c")
   }
 }
+*/

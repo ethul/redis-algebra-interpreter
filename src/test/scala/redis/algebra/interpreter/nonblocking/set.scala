@@ -10,6 +10,7 @@ import scalaz.syntax.std.option._
 
 import all._
 
+/*
 class NonBlockingSetInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
   This is the specification for the set instance.
 
@@ -34,3 +35,4 @@ class NonBlockingSetInstanceSpec extends Specification with InterpreterSpec { de
     val member = generate
   }
 }
+*/

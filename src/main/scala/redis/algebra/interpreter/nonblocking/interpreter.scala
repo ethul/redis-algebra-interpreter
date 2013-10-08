@@ -32,10 +32,7 @@ sealed trait NonBlockingInstances {
 
 sealed trait NonBlockingFunctions {
   def run[A](algebra: Free[R, A], client: RedisClient)(implicit EC: ExecutionContext, T: Timeout): Future[A] =
-    algebra.resume.fold(
-      a => implicitly[NonBlocking[R]].runAlgebra(a, client).flatMap(a => run(a, client)),
-      _.point[Future]
-    )
+    algebra.runM(fa => implicitly[NonBlocking[R]].runAlgebra(fa, client))
 }
 
 object NonBlocking

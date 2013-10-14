@@ -32,6 +32,11 @@ trait InterpreterSpecification extends Specification {
 
   def genkey(a: ByteString) = s"${prefix}:${UUID.randomUUID.toString}:".utf8 ++ a
 
+  def genkeys(a: NonEmptyList[ByteString]) = {
+    val p = generate
+    a.map(p ++ _)
+  }
+
   def clean = run(all.keys[R](s"${prefix}*".utf8).map(_.toList) >>= { case a :: as => all.del[R](nel(a, as)) case _ => 0L.point[F] })
 
   def close() = client.clientRef ! Tcp.Close
@@ -53,6 +58,10 @@ trait InterpreterSpecification extends Specification {
   implicit def ByteArrayToByteArrayOps(a: Array[Byte]): ByteArrayOps = new ByteArrayOps { val self = a }
 
   implicit def ByteStringToByteStringOps(a: ByteString): ByteStringOps = new ByteStringOps { val self = a }
+
+  implicit def LongToStringOps(a: Long): StringOps = new StringOps { val self = a.toString }
+
+  implicit def IntToStringOps(a: Int): StringOps = new StringOps { val self = a.toString }
 }
 
 sealed abstract class StringOps extends Ops[String] {

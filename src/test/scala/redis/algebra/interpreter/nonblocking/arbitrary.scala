@@ -20,4 +20,16 @@ trait ArbitraryInstances {
         t <- listOfN(n, arbitrary[A])
       } yield nel(h, t)
     }
+
+  val arbByteStringSometimesMatchingPair: Arbitrary[(ByteString, ByteString)] =
+    Arbitrary {
+      for {
+        a <- arbitrary[ByteString]
+        b <- arbitrary[ByteString]
+        c <- Gen.oneOf(a, b)
+      } yield (a, c)
+    }
+
+  val arbSeconds: Arbitrary[Seconds] =
+    Arbitrary(Gen.posNum[Long])
 }

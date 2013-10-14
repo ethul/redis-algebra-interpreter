@@ -14,7 +14,7 @@ import com.redis.protocol.StringCommands.{EX, PX, NX, XX}
 import scala.concurrent.{ExecutionContext, Future}
 
 import scalaz.std.option._
-import scalaz.syntax.all._
+import scalaz.syntax.foldable._
 import scalaz.syntax.std.{boolean, option}, boolean._, option._
 
 import data.{And, Error, Not, Nx, Ok, Or, Xor, Xx}, future._, syntax._
@@ -26,8 +26,8 @@ trait NonBlockingStringInstance extends StringInstances {
         algebra match {
           case Append(k, v, h) =>
             client.ask(Command[Long](algebra.command, k.toArray +: v.toArray +: ANil)).map(h(_))
-          case Bitcount(k, s, e, h) =>
-            client.ask(Command[Long](algebra.command, k.toArray +: s.fzip(e).cata(a => a._1 +: a._2 +: ANil, ANil))).map(h(_))
+          case Bitcount(k, r, h) =>
+            client.ask(Command[Long](algebra.command, k.toArray +: r.cata(a => a._1 +: a._2 +: ANil, ANil))).map(h(_))
           case Bitop(op @ And(d, k), h) =>
             client.ask(Command[Long](algebra.command, op.command +: d.toArray +: k.map(_.toArray).list.toArgs)).map(h(_))
           case Bitop(op @ Or(d, k), h) =>

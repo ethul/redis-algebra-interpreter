@@ -3,36 +3,51 @@ package algebra
 package interpreter
 package nonblocking
 
-import org.specs2._, specification.BeforeAfter
+import org.specs2._, specification.Before
 
-import scalaz.NonEmptyList._
-import scalaz.syntax.std.option._
+import scalaz.NonEmptyList, NonEmptyList._
+import scalaz.std.list._
+import scalaz.syntax.{monad, traverse}, monad._, traverse._
+import scalaz.syntax.std.{list, option}, list._, option._
 
-import all._
+import algebra.{all => r}, r._
 
-/*
-class NonBlockingSetInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
+class NonBlockingSetInstanceSpec extends InterpreterSpecification with ArbitraryInstances with ScalaCheckSpecification { def is = s2"""
   This is the specification for the set instance.
 
-  Interpreting the smove command when the element has been moved should
-    result in true value                                                     ${ea().e1}
+  Interpreting the sadd command should
+    result in adding the value to the set at the given key             ${esadd().e1}
 
-  Interpreting the smove command when the element has not been moved should
-    result in false value                                                    ${ea().e2}
+  Interpreting the sismember command should
+    result in true when the value is a set member                      ${esismember().e1}
+
+  Interpreting the sremove command should
+    result in removing those values from the set                       ${esrem().e1}
   """
 
-  case class ea() extends BeforeAfter {
-    def before = run(sadd(key1, nels(member)))
-
-    def after = run(del(nels(key1)))
-
-    def e1 = this { run(smove(key1, key2, member)) === true }
-
-    def e2 = this { run(smove(key1, key2, "nonexisting")) === false }
-
-    val (key1, key2) = (generate, generate)
-
-    val member = generate
+  case class esadd() {
+    def e1 =
+      prop { (a: ByteString, b: NonEmptyList[ByteString]) =>
+        val k = genkey(a)
+        run(sadd[R](k, b) >>= (x => smembers[R](k).map((x, _)))) === ((b.list.toSet.size, b.list.toSet))
+      }
   }
+
+  case class esismember() {
+    def e1 =
+      prop { (a: ByteString, b: NonEmptyList[ByteString], c: NonEmptyList[ByteString]) =>
+        val k = genkey(a)
+        run(sadd[R](k, b) >> (b.append(c)).map(x => sismember[R](k, x)).list.sequenceU) ===
+          (b.map(_ => true).append(c.map(x => b.list.exists(_ == x)))).list
+      }
+  }
+
+  case class esrem() {
+    def e1 =
+      prop { (a: ByteString, b: NonEmptyList[ByteString], c: NonEmptyList[ByteString]) =>
+        val k = genkey(a)
+        run(sadd[R](k, b.append(c)) >> srem[R](k, b) >> smembers[R](k)) === ((b.append(c)).list.toSet -- b.list.toSet)
+      }
+  }
+
 }
-*/

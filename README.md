@@ -17,35 +17,34 @@ resolvers += "Github ethul/ivy-repository snapshots" at "https://github.com/ethu
 ```scala
 import com.redis.RedisClient
 
-import akka.util.Timeout
 import akka.actor.ActorSystem
+import akka.util.Timeout
 
-import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
-import scalaz.NonEmptyList, NonEmptyList._
+import scalaz.{CharSet, NonEmptyList}, NonEmptyList.nels
 import scalaz.std.list._
-import scalaz.syntax.all._
+import scalaz.syntax.{Ops, comonad, monad, traverse}, comonad._, monad._, traverse._
+import scalaz.syntax.std.list._
 
-import redis.algebra.{F, R}
-import redis.algebra.all._
-import redis.algebra.interpreter.nonblocking.NonBlocking
+import redis.algebra.{R, all}, all._
+import redis.algebra.interpreter.nonblocking.{NonBlocking, future}, future._
 
 val e0 =
-  set[R]("key", "value") >>
-  get[R]("key")
+  set[R]("key".utf8, "value".utf8) >>
+  get[R]("key".utf8)
 
 val e1 =
-  set[R]("counter", "100") >>
-  incr[R]("counter") >>
-  incr[R]("counter") >>
-  incrby[R]("counter", 10)
+  set[R]("counter".utf8, "100".utf8) >>
+  incr[R]("counter".utf8) >>
+  incr[R]("counter".utf8) >>
+  incrby[R]("counter".utf8, 10)
 
 val e2 =
-  List("first", "second", "third").map(a => rpush[R]("messages", nels(a))).sequenceU >>
-  lrange[R]("messages", 0, 2)
+  List("first".utf8, "second".utf8, "third".utf8).map(a => rpush[R]("messages".utf8, nels(a))).sequenceU >>
+  lrange[R]("messages".utf8, 0, 2)
 
-val duration = Duration(2, "seconds")
+implicit val duration = Duration(2, "seconds")
 
 implicit val system = ActorSystem("redis-algebra-interpreter")
 
@@ -53,20 +52,24 @@ implicit val executionContext = system.dispatcher
 
 implicit val timeout = Timeout(duration)
 
-val client = RedisClient("localhost", 6379)
+lazy val client = RedisClient("localhost", 6379)
 
-val r0 = Await.result(NonBlocking.run(e0, client), duration)
+implicit def StringToStringOps(a: String): StringOps = new StringOps { val self = a }
 
-val r1 = Await.result(NonBlocking.run(e1, client), duration)
+sealed abstract class StringOps extends Ops[String] { final def utf8 = self.getBytes(CharSet.UTF8).toIndexedSeq }
 
-val r2 = Await.result(NonBlocking.run(e2, client), duration)
+val r0 = NonBlocking.run(e0, client).copoint
+
+val r1 = NonBlocking.run(e1, client).copoint
+
+val r2 = NonBlocking.run(e2, client).copoint
 
 println(r0)
-// Some(value)
+// Some(ByteString(118, 97, 108, 117, 101))
 
 println(r1)
 // 112
 
 println(r2)
-// List(first, second, third)
+// Vector(ByteString(102, 105, 114, 115, 116), ByteString(115, 101, 99, 111, 110, 100), ByteString(116, 104, 105, 114, 100))
 ```

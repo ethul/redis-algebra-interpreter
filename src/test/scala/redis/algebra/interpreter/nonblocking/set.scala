@@ -49,5 +49,4 @@ class NonBlockingSetInstanceSpec extends InterpreterSpecification with Arbitrary
         run(sadd[R](k, b.append(c)) >> srem[R](k, b) >> smembers[R](k)) === ((b.append(c)).list.toSet -- b.list.toSet)
       }
   }
-
 }

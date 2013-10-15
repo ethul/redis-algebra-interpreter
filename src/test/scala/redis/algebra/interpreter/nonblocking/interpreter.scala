@@ -21,8 +21,6 @@ import scalaz.syntax.{comonad, monad}, comonad._, monad._
 
 import all._, future._
 
-trait InterpreterSpec extends InterpreterSpecification
-
 trait InterpreterSpecification extends Specification {
   override def map(fs: => Fragments) = Step(client) ^ fs ^ Step(clean) ^ Step(close)
 

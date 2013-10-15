@@ -8,7 +8,7 @@ import scala.concurrent.duration.Duration
 
 import scalaz.{Comonad, Monad}
 
-sealed trait FutureInstances {
+trait FutureInstances {
   implicit def futureMonad(implicit EC: ExecutionContext): Monad[Future] =
     new Monad[Future] {
       override def map[A, B](fa: Future[A])(f: A => B): Future[B] = fa.map(f)
@@ -23,5 +23,3 @@ sealed trait FutureInstances {
       def cobind[A, B](fa: Future[A])(f: Future[A] => B): Future[B] = Future(f(fa))
     }
 }
-
-object future extends FutureInstances

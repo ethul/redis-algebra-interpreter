@@ -4,14 +4,17 @@ package interpreter
 package nonblocking
 
 import com.redis.RedisClient
+import com.redis.protocol.{ANil, ArgsOps, RedisCommand}, RedisCommand.Args
+import com.redis.serialization.DefaultWriters.{anyWriter => _, _}
 
-import akka.util.Timeout
+import akka.util.{ByteString => AkkaByteString, Timeout}
 
+import scala.collection.immutable.{Set => ScalaSet}
 import scala.concurrent.{ExecutionContext, Future}
 
 import scalaz.syntax.std.option._
 
-import future._
+import future._, syntax._
 
 trait NonBlockingSetInstance extends SetInstances {
   implicit def setAlgebraNonBlocking(implicit EC: ExecutionContext, T: Timeout): NonBlocking[SetAlgebra] =
@@ -19,33 +22,33 @@ trait NonBlockingSetInstance extends SetInstances {
       def runAlgebra[A](algebra: SetAlgebra[A], client: RedisClient) =
         algebra match {
           case Sadd(k, m, h) =>
-            client.sadd(k, m.head, m.tail:_*).map(h(_))
+            client.ask(Command[Long](algebra.command, k.toArray +: m.map(_.toArray).list.toArgs)).map(h(_))
           case Scard(k, h) =>
-            client.scard(k).map(h(_))
+            client.ask(Command[Long](algebra.command, k.toArray +: ANil)).map(h(_))
           case Sdiff(k, h) =>
-            client.sdiff(k.head, k.tail:_*).map(h(_))
+            client.ask(Command[ScalaSet[AkkaByteString]](algebra.command, k.map(_.toArray).list.toArgs)).map(a => h(a.map(_.toIndexedSeq)))
           case Sdiffstore(d, k, h) =>
-            client.sdiffstore(d, k.head, k.tail:_*).map(h(_))
+            client.ask(Command[Long](algebra.command, d.toArray +: k.map(_.toArray).list.toArgs)).map(h(_))
           case Sinter(k, h) =>
-            client.sinter(k.head, k.tail:_*).map(h(_))
+            client.ask(Command[ScalaSet[AkkaByteString]](algebra.command, k.map(_.toArray).list.toArgs)).map(a => h(a.map(_.toIndexedSeq)))
           case Sinterstore(d, k, h) =>
-            client.sinterstore(d, k.head, k.tail:_*).map(h(_))
+            client.ask(Command[Long](algebra.command, d.toArray +: k.map(_.toArray).list.toArgs)).map(h(_))
           case Sismember(k, m, h) =>
-            client.sismember(k, m).map(h(_))
+            client.ask(Command[Boolean](algebra.command, k.toArray +: m.toArray +: ANil)).map(h(_))
           case Smembers(k, h) =>
-            client.smembers(k).map(h(_))
+            client.ask(Command[ScalaSet[AkkaByteString]](algebra.command, k.toArray +: ANil)).map(a => h(a.map(_.toIndexedSeq)))
           case Smove(s, d, m, h) =>
-            client.smove(s, d, m).map(a => h(a == 1L))
+            client.ask(Command[Boolean](algebra.command, s.toArray +: d.toArray +: m.toArray +: ANil)).map(h(_))
           case Spop(k, h) =>
-            client.spop(k).map(h(_))
+            client.ask(Command[Option[AkkaByteString]](algebra.command, k.toArray +: ANil)).map(h(_))
           case Srandmember(k, c, h) =>
-            client.srandmember(k, c.cata(a => a.toInt, 1)).map(a => h(a.toSet))
+            client.ask(Command[ScalaSet[AkkaByteString]](algebra.command, k.toArray +: c.cata(_ +: ANil, ANil))).map(a => h(a.map(_.toIndexedSeq)))
           case Srem(k, m, h) =>
-            client.srem(k, m.head, m.tail:_*).map(h(_))
+            client.ask(Command[Long](algebra.command, k.toArray +: m.map(_.toArray).list.toArgs)).map(h(_))
           case Sunion(k, h) =>
-            client.sunion(k.head, k.tail:_*).map(h(_))
+            client.ask(Command[ScalaSet[AkkaByteString]](algebra.command, k.map(_.toArray).list.toArgs)).map(a => h(a.map(_.toIndexedSeq)))
           case Sunionstore(d, k, h) =>
-            client.sunionstore(d, k.head, k.tail:_*).map(h(_))
+            client.ask(Command[Long](algebra.command, d.toArray +: k.map(_.toArray).list.toArgs)).map(h(_))
         }
     }
 }

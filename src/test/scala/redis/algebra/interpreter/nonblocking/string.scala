@@ -3,113 +3,200 @@ package algebra
 package interpreter
 package nonblocking
 
-import org.specs2._, specification.{After, BeforeAfter}
+import org.specs2._, specification.Before
+import org.scalacheck.Arbitrary
+
+import akka.util.{ByteString => AkkaByteString}
 
 import scalaz.{-\/, \/-, NonEmptyList}, NonEmptyList._
 import scalaz.std.option._
 import scalaz.syntax.{monad, zip}, monad._, zip._
 import scalaz.syntax.std.option._
 
-import all._
+import algebra.{all => r}, r._, algebra.data.{And, Error, Not, Nx, Ok, Or, Xor, Xx}
 
-class NonBlockingStringInstanceSpec extends Specification with InterpreterSpec { def is = s2"""
+class NonBlockingStringInstanceSpec extends InterpreterSpecification with ArbitraryInstances with ScalaCheckSpecification { def is = s2"""
   This is the specification for the string instance.
 
+  Interpreting the append command should
+    result in the value appendeded to the value of the string key                  ${eappend().e1}
+
   Interpreting the bitop command with the and operation should
-    result in storing the bitwise and of the strings                               ${ea().e1}
+    result in storing the bitwise and of the strings                               ${ebitop().e1}
 
   Interpreting the bitop command with the or operation should
-    result in storing the bitwise or of the strings                                ${ea().e2}
+    result in storing the bitwise or of the strings                                ${ebitop().e2}
 
   Interpreting the bitop command with the xor operation should
-    result in storing the bitwise xor of the strings                               ${ea().e3}
+    result in storing the bitwise xor of the strings                               ${ebitop().e3}
 
   Interpreting the bitop command with the not operation should
-    result in storing the bitwise not of the string                                ${ea().e4}
+    result in storing the bitwise not of the string                                ${ebitop().e4}
 
-  Interpreting the mget command with some existing keys should
-    result in a list of optional values                                            ${eb().e5}
+  Interpreting the decr command should
+    result in decrementing the value of the key by one                             ${edecr().e1}
 
-  Interpreting the set command with only a key and value should
-    result in updating the value at that key                                       ${ec().e6}
+  Interpreting the decrby command should
+    result in decrementing the value of the key by the provided value              ${edecrby().e1}
 
-  Interpreting the set command with a key, value, seconds, and nx should
-    result in updating the value at that key with an expiration                    ${ec().e7}
+  Interpreting the get command should
+    result optionally in the value for the given key                               ${eget().e1}
 
-  Interpreting the set command with an existing key and nx should
-    result in not updating the value at that key                                   ${ec().e8}
+  Interpreting the getset command should
+    result optionally in the old value for the given key                           ${egetset().e1}
 
-  Interpreting the set command with an existing key, value, millis, and xx should
-    result in updating the value at that key with an expiration                    ${ec().e9}
+  Interpreting the set command with a value should
+    result in the value being stored at the given key                              ${eset().e1}
 
-  Interpreting the set command with a key, value, millis, and xx should
-    result in not updating the value at that key                                   ${ec().e10}
+  Interpreting the set command with a value and ttl in seconds should
+    result in the value being stored at the given key with a ttl                   ${eset().e2}
+
+  Interpreting the set command with a value and ttl in milliseconds should
+    result in the value being stored at the given key with a ttl                   ${eset().e3}
+
+  Interpreting the set command with Nx or XX options should
+    result in the value being stored depending on the current value at the key     ${eset().e4}
   """
 
-  case class ea() extends BeforeAfter {
-    def before = run(set[R](key1, "a1") >> set[R](key2, "a2") >> set[R](key3, "z"))
-
-    def after = run(del(nels(key1, key2, key3, key4)))
-
-    def e1 = this { run(bitop[R](And(key4, nels(key1, key2))) >> get[R](key4)) must beSome("a0") }
-
-    def e2 = this { run(bitop[R](Or(key4, nels(key1, key2))) >> get[R](key4)) must beSome("a3") }
-
-    def e3 = this { run(bitop[R](Xor(key4, nels(key1, key2))) >> get[R](key4)) must beSome("\0\3") }
-
-    def e4 = this { run(bitop[R](Not(key4, key3)) >> get[R](key4)) must beSome(s"${0x0085.toChar}") }
-
-    val (key1, key2, key3, key4) = (generate, generate, generate, generate)
+  case class eappend() {
+    def e1 =
+      prop { (a: ByteString, b: ByteString, c: ByteString) =>
+        val key = genkey(a)
+        run {
+          r.set[R](key, b) >>
+          append[R](key, c) >>=
+          (x => get[R](key).map(_.map((x, _))))
+        } must beSome((b.size + c.size, b ++ c))
+      }
   }
 
-  case class eb() extends BeforeAfter {
-    def before = run(set[R](key1, value1) >> set[R](key2, value2) >> set[R](key3, value3))
+  case class ebitop() {
+    def e1 =
+      prop { (a: ByteString, b: NonEmptyList[(ByteString, ByteString)]) =>
+        val (c,d) = b.unzip
+        val dest = genkey(a)
+        val ks = c.map(genkey(_))
+        run {
+          mset[R](ks.zip(d)) >>
+          bitop[R](And(dest, ks)) >>
+          get[R](dest)
+        } must beSome(op(d, _ & _))
+      }
 
-    def after = run(del(nels(key1, key2, key3)))
+    def e2 =
+      prop { (a: ByteString, b: NonEmptyList[(ByteString, ByteString)]) =>
+        val (c,d) = b.unzip
+        val dest = genkey(a)
+        val ks = c.map(genkey(_))
+        run {
+          mset[R](ks.zip(d)) >>
+          bitop[R](Or(dest, ks)) >>
+          get[R](dest)
+        } must beSome(op(d, _ | _))
+      }
 
-    def e5 = this { run(mget(nels(key1, key2, key3, key4))) === List(value1.some, value2.some, value3.some, None) }
+    def e3 =
+      prop { (a: ByteString, b: NonEmptyList[(ByteString, ByteString)]) =>
+        val (c,d) = b.unzip
+        val dest = genkey(a)
+        val ks = c.map(genkey(_))
+        run {
+          mset[R](ks.zip(d)) >>
+          bitop[R](Xor(dest, ks)) >>
+          get[R](dest)
+        } must beSome(op(d, _ ^ _))
+      }
 
-    val (key1, key2, key3, key4) = (generate, generate, generate, generate)
+    def e4 =
+      prop { (a: ByteString, b: ByteString, c: ByteString) =>
+        val dest = genkey(a)
+        val k = genkey(b)
+        val res = c.map(~_.toByte)
+        run {
+          r.set[R](k, c) >>
+          bitop[R](Not(dest, k)) >>
+          get[R](dest)
+        } must beSome(res)
+      }
 
-    val (value1, value2, value3) = ("a", "b", "c")
+    def op(as: NonEmptyList[ByteString], f: (Byte, Byte) => Int) =
+      as.map(a => AkkaByteString(a.toArray).padTo(as.list.maxBy(_.size).size, 0.toByte).toArray).list.
+        transpose.map(_.reduce(f(_, _).toByte))
   }
 
-  case class ec() extends After {
-    def after = run(del(nels(key)))
-
-    def e6 = this { run(set[R](key, value1) >> get[R](key)) must beSome(value1) }
-
-    def e7 = this { run {
-      set[R](key, value1, -\/(expiration).some, Nx.some) >>
-      get[R](key) >>= { a =>
-        ttl[R](key).map { b =>
-          a.fzip(b)
-        }
+  case class edecr() {
+    def e1 =
+      prop { (a: ByteString, b: Int) =>
+        val k = genkey(a)
+        run(r.set[R](k, b.utf8) >> decr[R](k)) === b.toLong - 1L
       }
-    } must beSome((value1, expiration)) }
+  }
 
-    def e8 = this { run {
-      set[R](key, value1) >>
-      set[R](key, value2, -\/(expiration).some, Nx.some) >>
-      get[R](key)
-    } must beSome(value1) }
-
-    def e9 = this { run {
-      set[R](key, value1) >>
-      set[R](key, value2, \/-(expiration).some, Xx.some) >>
-      get[R](key) >>= { a =>
-        ttl[R](key).map { b =>
-          a.fzip(b)
-        }
+  case class edecrby() {
+    def e1 =
+      prop { (a: ByteString, b: Int, c: Int) =>
+        val k = genkey(a)
+        run(r.set[R](k, b.utf8) >> decrby[R](k, c)) === b.toLong - c.toLong
       }
-    } must beSome((value2, expiration / 1000L)) }
+  }
 
-    def e10 = this { run { set[R](key, value2, \/-(expiration).some, Xx.some) >> get[R](key) } must beNone }
+  case class eget() {
+    implicit val A0: Arbitrary[(ByteString, ByteString)] = arbByteStringSometimesMatchingPair
 
-    val key = generate
+    def e1 =
+      prop { (a: (ByteString, ByteString), b: ByteString) =>
+        val (a0, a1) = a
+        val ks = genkeys(nels(a0, a1))
+        run(r.set[R](ks.head, b) >> get[R](ks.tail.head)) must (if (a0 == a1) beSome(b) else beNone)
+      }
+  }
 
-    val (value1, value2) = ("a", "b")
+  case class egetset() {
+    implicit val A0: Arbitrary[(ByteString, ByteString)] = arbByteStringSometimesMatchingPair
 
-    val expiration = 10000L
+    def e1 =
+      prop { (a: (ByteString, ByteString), b: ByteString, c: ByteString) =>
+        val (a0, a1) = a
+        val ks = genkeys(nels(a0, a1))
+        run(r.set[R](ks.head, b) >> getset[R](ks.tail.head, c) >>= (x => get[R](ks.tail.head).map((x, _)))) ===
+          (if (a0 == a1) (Some(b), Some(c)) else (None, Some(c)))
+      }
+  }
+
+  case class eset() {
+    def e1 =
+      prop { (a: ByteString, b: ByteString) =>
+        val k = genkey(a)
+        run(r.set[R](k, b) >> get[R](k)) must beSome(b)
+      }
+
+    def e2 = {
+      implicit val A0: Arbitrary[Seconds] = arbSeconds
+      prop { (a: ByteString, b: ByteString, e: Seconds) =>
+        val k = genkey(a)
+        run(r.set[R](k, b, -\/(e).some) >> get[R](k) >>= (x => ttl[R](k).map((x, _)))) === ((b.some, e.some))
+      }
+    }
+
+    def e3 = {
+      implicit val A0: Arbitrary[Milliseconds] = Arbitrary(arbSeconds.arbitrary.map(_ * 1000L))
+      prop { (a: ByteString, b: ByteString, e: Milliseconds) =>
+        val k = genkey(a)
+        run(r.set[R](k, b, \/-(e).some) >> get[R](k) >>= (x => ttl[R](k).map((x, _)))) === ((b.some, (e / 1000L).some))
+      }
+    }
+
+    def e4 = {
+      implicit val A0: Arbitrary[Seconds] = arbSeconds
+      prop { (a: ByteString, b: ByteString, c: ByteString, e: Seconds) =>
+        val k = genkey(a)
+        run {
+          r.set[R](k, b, -\/(e).some, Nx.some) >>
+          r.set[R](k, c, None, Xx.some) >>
+          get[R](k) >>=
+          (x => ttl[R](k).map((x, _)))
+        } === ((c.some, None))
+      }
+    }
   }
 }

@@ -6,7 +6,7 @@ version := "0.1.0-SNAPSHOT"
 
 scalaVersion := "2.10.4"
 
-libraryDependencies += "com.github.ethul" %% "redis-algebra" % "0.1.0-SNAPSHOT"
+libraryDependencies += "com.github.ethul" %% "redis-algebra" % "0.1.0-SNAPSHOT" changing()
 
 libraryDependencies += "net.debasishg" %% "redisreact" % "0.5"
 
